@@ -1,0 +1,19 @@
+{
+  "name": "telegram-check-bot",
+  "version": "1.0.0",
+  "description": "Telegram bot for receipt upload and lottery participation",
+  "main": "src/app.js",
+  "scripts": {
+    "start": "node src/app.js",
+    "dev": "nodemon src/app.js"
+  },
+  "dependencies": {
+    "dotenv": "^17.2.3",
+    "exceljs": "^4.4.0",
+    "fs-extra": "^11.3.2",
+    "mysql2": "^3.15.2",
+    "nodemon": "^3.1.10",
+    "sequelize": "^6.37.7",
+    "telegraf": "^4.16.3"
+  }
+}

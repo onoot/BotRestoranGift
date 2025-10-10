@@ -1,0 +1,6 @@
+{
+  "maxAgeDays": 30,
+  "maxWinners": 10,
+  "enabled": true,
+  "description": "Розыгрыш проводится ежемесячно. Каждый чек от 2000₽ = 1 билет."
+}
