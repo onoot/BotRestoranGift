@@ -3,7 +3,7 @@ const { BOT_TOKEN } = require('../config/botConfig');
 const uploadScene = require('./scenes/uploadScene');
 
 const { User } = require('../db/database'); 
-const { checkUserSubscription } = require('../services/subscriptionService.js');
+// const { checkUserSubscription } = require('../services/subscriptionService.js');
 const { checkSubcs } = require('./keyboards/keyboards');
 
 const { startHandler } = require('./handlers/userHandlers');
@@ -52,34 +52,22 @@ bot.action(['confirm_receipt', 'cancel_receipt'], confirmReceiptHandler);
 bot.action('upload_receipt', async (ctx) => {
   const userId = ctx.from.id;
 
-  // Удаляем предыдущее сообщение, если возможно
   try { await ctx.deleteMessage(); } catch (e) {}
 
-  // Найдём пользователя
-  let user = await User.findOne({ where: { telegramId: userId } });
+  const user = await User.findOne({ where: { telegramId: userId } });
   if (!user) {
     return ctx.reply('❌ Сначала нажмите /start');
   }
 
-  // Если уже подписан — пускаем
   if (user.subscribe) {
     return ctx.scene.enter('upload_scene');
   }
 
-  // Иначе — проверим актуальную подписку
-  const isSubscribed = await checkUserSubscription(ctx.telegram, userId);
-
-  if (isSubscribed) {
-    // Обновляем БД
-    await user.update({ subscribe: true });
-    return ctx.scene.enter('upload_scene');
-  } else {
-    // Просим подписаться
-    return ctx.reply(
-      '🔒 Для участия в розыгрыше необходимо подписаться на наш канал!',
-      checkSubcs
-    );
-  }
+  // Просто показываем клавиатуру — без проверки
+  return ctx.reply(
+    '🔒 Для участия в розыгрыше необходимо подписаться на наш канал ВКонтакте!',
+    checkSubcs
+  );
 });
 
 bot.action('check_subscription', async (ctx) => {
@@ -90,10 +78,11 @@ bot.action('check_subscription', async (ctx) => {
     return ctx.answerCbQuery('❌ Сначала нажмите /start', { show_alert: true });
   }
 
-    await user.update({ subscribe: true });
-    await ctx.answerCbQuery('✅ Подписка подтверждена!', { show_alert: true });
-    await ctx.editMessageText('Главное меню:', mainMenu);
-  
+  // Просто доверяем пользователю — ставим subscribe = true
+  await user.update({ subscribe: true });
+
+  await ctx.answerCbQuery('✅ Подписка подтверждена!', { show_alert: true });
+  await ctx.editMessageText('Главное меню:', mainMenu);
 });
 
 // Админка
