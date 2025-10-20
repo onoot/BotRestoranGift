@@ -59,15 +59,7 @@ bot.action('upload_receipt', async (ctx) => {
     return ctx.reply('❌ Сначала нажмите /start');
   }
 
-  if (user.subscribe) {
-    return ctx.scene.enter('upload_scene');
-  }
-
-  // Просто показываем клавиатуру — без проверки
-  return ctx.reply(
-    '🔒 Для участия в розыгрыше необходимо подписаться на наш канал ВКонтакте!',
-    checkSubcs
-  );
+  return ctx.scene.enter('upload_scene');
 });
 
 bot.action('check_subscription', async (ctx) => {

@@ -1,13 +1,22 @@
-//src\bot\scenes\uploadScene.js
 const { Scenes } = require('telegraf');
+const { User } = require('../../db/database');
+const { checkSubcs, confirmReceipt, backToMain } = require('../keyboards/keyboards');
 
 const uploadScene = new Scenes.BaseScene('upload_scene');
 
-uploadScene.enter((ctx) => {
+uploadScene.enter(async (ctx) => {
+  const userId = ctx.from.id;
+  const user = await User.findOne({ where: { telegramId: userId } });
+  if (!user) {
+    await ctx.reply('❌ Сначала нажмите /start');
+    return ctx.scene.leave();
+  }
+
+  ctx.session.userSubscribe = user.subscribe;
   ctx.session.receiptData = {};
-  return ctx.reply(
+  await ctx.reply(
     '📷Пожалуйста, загрузите фото чека или квитанции (чек выдается при посещении ресторанов Ялта, а квитанция — если вы оформляли доставку)',
-    require('../keyboards/keyboards').backToMain
+    backToMain
   );
 });
 
@@ -16,13 +25,13 @@ uploadScene.on('photo', async (ctx) => {
   const fileId = photo.file_id;
   const filePath = await ctx.telegram.getFileLink(fileId);
   const localPath = `./temp_${Date.now()}_${ctx.from.id}.jpg`;
-  
+
   const response = await fetch(filePath);
   const arrayBuffer = await response.arrayBuffer();
   require('fs').writeFileSync(localPath, Buffer.from(arrayBuffer));
 
   ctx.session.receiptData.photoPath = localPath;
-  await ctx.reply('Теперь введите номер чека/квитанции⤵️', require('../keyboards/keyboards').backToMain);
+  await ctx.reply('Теперь введите номер чека/квитанции⤵️', backToMain);
   ctx.scene.state.next = 'orderId';
 });
 
@@ -34,7 +43,7 @@ uploadScene.on('text', async (ctx) => {
   if (ctx.scene.state.next === 'orderId') {
     ctx.session.receiptData.orderId = ctx.message.text.trim();
     ctx.scene.state.next = 'amount';
-  return ctx.reply('Введите сумму чека/квитанции⤵️', require('../keyboards/keyboards').backToMain);
+    return ctx.reply('Введите сумму чека/квитанции⤵️', backToMain);
   }
 
   if (ctx.scene.state.next === 'amount') {
@@ -45,23 +54,66 @@ uploadScene.on('text', async (ctx) => {
     }
     ctx.session.receiptData.amount = amount;
 
-    await ctx.reply(
-      `Проверьте данные:\nНомер заказа: ${ctx.session.receiptData.orderId}\nСумма: ${amount} руб.`,
-      require('../keyboards/keyboards').confirmReceipt
-    );
-// Обработка нажатия кнопки отмены на любом этапе
-uploadScene.action('back_to_main', async (ctx) => {
-  // Удаляем временные данные и файл
-  if (ctx.session && ctx.session.receiptData && ctx.session.receiptData.photoPath) {
-    const fs = require('fs');
-    try { fs.unlinkSync(ctx.session.receiptData.photoPath); } catch (e) {}
-  }
-  ctx.session.receiptData = undefined;
-  await ctx.reply('❌ Загрузка чека отменена.', require('../keyboards/keyboards').mainMenu);
-  return ctx.scene.leave();
-});
-    return ctx.scene.leave();
+    const isSubscribed = ctx.session.userSubscribe;
+
+    if (isSubscribed) {
+      await ctx.reply(
+        `Проверьте данные:\nНомер заказа: ${ctx.session.receiptData.orderId}\nСумма: ${amount} руб.`,
+        confirmReceipt
+      );
+      return ctx.scene.leave();
+    } else {
+      // Показываем клавиатуру подписки, НО НЕ завершаем сцену
+      await ctx.reply(
+        '🔒 Пожалуйста, проверьте, подписаны ли Вы на наш канал ВКонтакте!',
+        checkSubcs
+      );
+      // Остаёмся в сцене — ожидаем нажатия кнопки
+      // Дальнейшая обработка — в uploadScene.action('check_subscription')
+      return; // не завершаем сцену!
+    }
   }
 });
 
-module.exports = uploadScene; // ← именно так!
+// Обработка нажатия "Проверить подписку" ВНУТРИ сцены
+uploadScene.action('check_subscription', async (ctx) => {
+  const userId = ctx.from.id;
+  const user = await User.findOne({ where: { telegramId: userId } });
+
+  if (!user) {
+    await ctx.answerCbQuery('❌ Сначала нажмите /start', { show_alert: true });
+    return ctx.scene.leave();
+  }
+
+  // Доверяем — ставим subscribe = true
+  await user.update({ subscribe: true });
+
+  await ctx.answerCbQuery('✅ Подписка подтверждена!', { show_alert: true });
+
+  // Теперь показываем подтверждение чека, если данные есть
+  if (ctx.session.receiptData?.orderId && ctx.session.receiptData?.amount) {
+    const amount = ctx.session.receiptData.amount;
+    await ctx.reply(
+      `Проверьте данные:\nНомер заказа: ${ctx.session.receiptData.orderId}\nСумма: ${amount} руб.`,
+      confirmReceipt
+    );
+  } else {
+    await ctx.reply('❌ Данные чека утеряны. Начните заново.', backToMain);
+  }
+
+  return ctx.scene.leave();
+});
+
+// Обработка отмены
+uploadScene.action('back_to_main', async (ctx) => {
+  if (ctx.session?.receiptData?.photoPath) {
+    try {
+      require('fs').unlinkSync(ctx.session.receiptData.photoPath);
+    } catch (e) {}
+  }
+  ctx.session.receiptData = undefined;
+  await ctx.reply('❌ Загрузка чека отменена.', backToMain);
+  return ctx.scene.leave();
+});
+
+module.exports = uploadScene;
