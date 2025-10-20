@@ -24,13 +24,16 @@ const backToMain = Markup.inlineKeyboard([
   [Markup.button.callback('🏠 В главное меню', 'back_to_main')],
 ]);
 
+const cencel = Markup.inlineKeyboard([
+  [Markup.button.callback('🏠 В главное меню', 'back_cancel_to_main')],
+]);
+
 const confirmReceipt = Markup.inlineKeyboard([
   Markup.button.callback('✅ Подтвердить', 'confirm_receipt'),
   Markup.button.callback('❌ Отменить', 'cancel_receipt'),
 ]);
 
 const checkSubcs = Markup.inlineKeyboard([
-  Markup.button.url('📢 Перейти в канал', 'https://t.me/g43gb34tg3'), 
   Markup.button.callback('✅ Проверить подписку', 'check_subscription'),
 ]);
 
@@ -57,5 +60,6 @@ module.exports = {
   confirmReceipt,
   drawSettingsMenu,
   noop,
-  checkSubcs
+  checkSubcs,
+  cencel
 };

@@ -1,5 +1,5 @@
 // src/bot/handlers/userHandlers.js
-const { mainMenu, backToMain } = require('../keyboards/keyboards');
+const { mainMenu, cencel, backToMain } = require('../keyboards/keyboards');
 const { User } = require('../../db/database');
 const { saveReceipt } = require('../../services/receiptService');
 const { getMessages } = require('../../services/messageService');
@@ -38,7 +38,8 @@ async function infoHandler(ctx) {
 async function offerHandler(ctx) {
   const messages = await getMessages();
   await ctx.answerCbQuery();
-  try { await ctx.deleteMessage(); } catch (e) {}
+  try { 
+    await ctx.deleteMessage(); } catch (e) {}
 
   // Разбиваем текст на части
   const offerParts = splitText(messages.offer);
@@ -47,7 +48,7 @@ async function offerHandler(ctx) {
   for (let i = 0; i < offerParts.length; i++) {
     if (i === offerParts.length - 1) {
       // Последняя часть — с кнопкой
-      const msg = await ctx.reply(offerParts[i], backToMain);
+      const msg = await ctx.reply(offerParts[i], cencel);
       sentMsgIds.push(msg.message_id);
     } else {
       // Остальные — без кнопки
@@ -84,19 +85,10 @@ async function confirmReceiptHandler(ctx) {
     try {
       await saveReceipt(ctx.from.id, photoPath, orderId, amount);
       const messages = await getMessages();
-      const { checkUserSubscription } = require('../../services/subscriptionService');
-      const isSubscribed = await checkUserSubscription(ctx.telegram, ctx.from.id);
-      if (!isSubscribed) {
-        await ctx.editMessageText(
-          '❗ Для участия необходимо быть подписанным на канал!',
-          require('../keyboards/keyboards').checkSubcs
-        );
-      } else {
         await ctx.editMessageText(
           messages.reward || '✅ Чек успешно загружен! Спасибо за участие!',
           backToMain
         );
-      }
       if (fs.existsSync(photoPath)) fs.unlinkSync(photoPath);
     } catch (e) {
       console.error('Ошибка сохранения чека:', e);

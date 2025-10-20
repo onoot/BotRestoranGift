@@ -81,6 +81,7 @@ bot.action('upload_receipt', async (ctx) => {
     );
   }
 });
+
 bot.action('check_subscription', async (ctx) => {
   const userId = ctx.from.id;
   const user = await User.findOne({ where: { telegramId: userId } });
@@ -89,16 +90,10 @@ bot.action('check_subscription', async (ctx) => {
     return ctx.answerCbQuery('❌ Сначала нажмите /start', { show_alert: true });
   }
 
-  const isSubscribed = await checkUserSubscription(ctx.telegram, userId);
-
-  if (isSubscribed) {
     await user.update({ subscribe: true });
     await ctx.answerCbQuery('✅ Подписка подтверждена!', { show_alert: true });
     await ctx.editMessageText('Главное меню:', mainMenu);
-  } else {
-    await ctx.answerCbQuery('❌ Вы не подписаны. Попробуйте снова.', { show_alert: true });
-    // Не редактируем сообщение — оставляем кнопки
-  }
+  
 });
 
 // Админка
@@ -120,6 +115,11 @@ bot.action('admin_run_draw', handleAdminAction('draw'));
 bot.action('back_to_main', (ctx) => {
   ctx.answerCbQuery();
   ctx.editMessageText('Главное меню:', mainMenu);
+});
+
+bot.action('back_cancel_to_main', (ctx) => {
+  ctx.answerCbQuery();
+  ctx.sendMessage('Главное меню:', mainMenu);
 });
 bot.action('back_to_admin', (ctx) => {
   if (!isAdmin(ctx)) return ctx.answerCbQuery('🚫 Доступ запрещён');

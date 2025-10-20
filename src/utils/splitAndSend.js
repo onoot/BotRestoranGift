@@ -14,8 +14,4 @@ async function splitAndSend(ctx, text, extra) {
   return sentMessages;
 }
 
-async function deleteMessages(ctx, messageIds) {
-  
-}
-
-module.exports = { splitAndSend, deleteMessages };
+module.exports = { splitAndSend };
