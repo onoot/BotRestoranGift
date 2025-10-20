@@ -1,8 +1,9 @@
+//src\bot\keyboards\keyboards.js
 const { Markup } = require('telegraf');
 
 const mainMenu = Markup.inlineKeyboard([
   [Markup.button.callback('📤 Загрузить чек', 'upload_receipt')],
-  [Markup.button.callback('ℹ️ О боте', 'info_bot')],
+  // [Markup.button.callback('ℹ️ О боте', 'info_bot')],
   [Markup.button.callback('📜 Публичная оферта', 'public_offer')],
   [Markup.button.callback('🎁 О розыгрыше', 'draw_info')],
 ]);
@@ -28,6 +29,11 @@ const confirmReceipt = Markup.inlineKeyboard([
   Markup.button.callback('❌ Отменить', 'cancel_receipt'),
 ]);
 
+const checkSubcs = Markup.inlineKeyboard([
+  Markup.button.url('📢 Перейти в канал', 'https://t.me/g43gb34tg3'), 
+  Markup.button.callback('✅ Проверить подписку', 'check_subscription'),
+]);
+
 // Упрощённое меню настроек — без "статичных" кнопок
 const drawSettingsMenu = (settings) => Markup.inlineKeyboard([
   [Markup.button.callback(`Мин. сумма: ${settings.minAmount} ₽`, 'noop')],
@@ -51,4 +57,5 @@ module.exports = {
   confirmReceipt,
   drawSettingsMenu,
   noop,
+  checkSubcs
 };

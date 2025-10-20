@@ -2,6 +2,10 @@ const { Telegraf, session, Scenes } = require('telegraf');
 const { BOT_TOKEN } = require('../config/botConfig');
 const uploadScene = require('./scenes/uploadScene');
 
+const { User } = require('../db/database'); 
+const { checkUserSubscription } = require('../services/subscriptionService.js');
+const { checkSubcs } = require('./keyboards/keyboards');
+
 const { startHandler } = require('./handlers/userHandlers');
 const {
   adminStart,
@@ -40,11 +44,62 @@ bot.use(stage.middleware());
 
 // Пользователь
 bot.start(startHandler);
-bot.action('upload_receipt', (ctx) => ctx.scene.enter('upload_scene'));
+// bot.action('upload_receipt', (ctx) => ctx.scene.enter('upload_scene'));
 bot.action('info_bot', infoHandler);
 bot.action('public_offer', offerHandler);
 bot.action('draw_info', drawInfoHandler);
 bot.action(['confirm_receipt', 'cancel_receipt'], confirmReceiptHandler);
+bot.action('upload_receipt', async (ctx) => {
+  const userId = ctx.from.id;
+
+  // Удаляем предыдущее сообщение, если возможно
+  try { await ctx.deleteMessage(); } catch (e) {}
+
+  // Найдём пользователя
+  let user = await User.findOne({ where: { telegramId: userId } });
+  if (!user) {
+    return ctx.reply('❌ Сначала нажмите /start');
+  }
+
+  // Если уже подписан — пускаем
+  if (user.subscribe) {
+    return ctx.scene.enter('upload_scene');
+  }
+
+  // Иначе — проверим актуальную подписку
+  const isSubscribed = await checkUserSubscription(ctx.telegram, userId);
+
+  if (isSubscribed) {
+    // Обновляем БД
+    await user.update({ subscribe: true });
+    return ctx.scene.enter('upload_scene');
+  } else {
+    // Просим подписаться
+    return ctx.reply(
+      '🔒 Для участия в розыгрыше необходимо подписаться на наш канал!',
+      checkSubcs
+    );
+  }
+});
+bot.action('check_subscription', async (ctx) => {
+  const userId = ctx.from.id;
+  const user = await User.findOne({ where: { telegramId: userId } });
+
+  if (!user) {
+    return ctx.answerCbQuery('❌ Сначала нажмите /start', { show_alert: true });
+  }
+
+  const isSubscribed = await checkUserSubscription(ctx.telegram, userId);
+
+  if (isSubscribed) {
+    await user.update({ subscribe: true });
+    await ctx.answerCbQuery('✅ Подписка подтверждена!', { show_alert: true });
+    await ctx.editMessageText('Главное меню:', mainMenu);
+  } else {
+    await ctx.answerCbQuery('❌ Вы не подписаны. Попробуйте снова.', { show_alert: true });
+    // Не редактируем сообщение — оставляем кнопки
+  }
+});
 
 // Админка
 bot.command('admin', adminStart);

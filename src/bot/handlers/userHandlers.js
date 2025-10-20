@@ -5,6 +5,15 @@ const { saveReceipt } = require('../../services/receiptService');
 const { getMessages } = require('../../services/messageService');
 const { getDrawSettings } = require('../../services/drawSettingsService'); 
 const fs = require('fs');
+const MAX_LENGTH = 4096;
+
+function splitText(text) {
+  const parts = [];
+  for (let i = 0; i < text.length; i += MAX_LENGTH) {
+    parts.push(text.slice(i, i + MAX_LENGTH));
+  }
+  return parts;
+}
 
 async function startHandler(ctx) {
   const { id, username, first_name, last_name } = ctx.from;
@@ -28,14 +37,30 @@ async function infoHandler(ctx) {
 
 async function offerHandler(ctx) {
   const messages = await getMessages();
-  return ctx.answerCbQuery().then(() =>
-    ctx.editMessageText(messages.offer, backToMain)
-  );
+  await ctx.answerCbQuery();
+  try { await ctx.deleteMessage(); } catch (e) {}
+
+  // Разбиваем текст на части
+  const offerParts = splitText(messages.offer);
+
+  let sentMsgIds = [];
+  for (let i = 0; i < offerParts.length; i++) {
+    if (i === offerParts.length - 1) {
+      // Последняя часть — с кнопкой
+      const msg = await ctx.reply(offerParts[i], backToMain);
+      sentMsgIds.push(msg.message_id);
+    } else {
+      // Остальные — без кнопки
+      const msg = await ctx.reply(offerParts[i]);
+      sentMsgIds.push(msg.message_id);
+    }
+  }
+  ctx.session.offerMsgIds = sentMsgIds;
 }
 
 async function drawInfoHandler(ctx) {
-  const settings = await getDrawSettings();
-  const text = settings.description || 'Розыгрыш временно недоступен.';
+  const {drawInfo} = await getMessages();
+  const text = drawInfo || 'Розыгрыш временно недоступен.';
   return ctx.answerCbQuery().then(() => ctx.editMessageText(text, backToMain));
 }
 
@@ -44,13 +69,12 @@ async function confirmReceiptHandler(ctx) {
 
   // ⚠️ Сразу отвечаем на callback, чтобы не было ошибки таймаута
   if (data === 'confirm_receipt') {
-    await ctx.answerCbQuery('✅ Обработка...'); // ← ОТВЕТ СРАЗУ
+    await ctx.answerCbQuery('✅ Обработка...');
   } else if (data === 'cancel_receipt') {
-    await ctx.answerCbQuery('❌ Отмена...'); // ← ОТВЕТ СРАЗУ
+    await ctx.answerCbQuery('❌ Загрузка отменена!');
   }
 
   if (!ctx.session.receiptData) {
-    // Уже ответили, просто редактируем сообщение
     return ctx.editMessageText('❌ Сессия устарела. Попробуйте снова.', backToMain);
   }
 
@@ -60,11 +84,19 @@ async function confirmReceiptHandler(ctx) {
     try {
       await saveReceipt(ctx.from.id, photoPath, orderId, amount);
       const messages = await getMessages();
-      await ctx.editMessageText(
-        messages.reward || '✅ Чек успешно загружен! Спасибо за участие!',
-        backToMain
-      );
-
+      const { checkUserSubscription } = require('../../services/subscriptionService');
+      const isSubscribed = await checkUserSubscription(ctx.telegram, ctx.from.id);
+      if (!isSubscribed) {
+        await ctx.editMessageText(
+          '❗ Для участия необходимо быть подписанным на канал!',
+          require('../keyboards/keyboards').checkSubcs
+        );
+      } else {
+        await ctx.editMessageText(
+          messages.reward || '✅ Чек успешно загружен! Спасибо за участие!',
+          backToMain
+        );
+      }
       if (fs.existsSync(photoPath)) fs.unlinkSync(photoPath);
     } catch (e) {
       console.error('Ошибка сохранения чека:', e);
@@ -73,12 +105,28 @@ async function confirmReceiptHandler(ctx) {
         backToMain
       );
     }
+    delete ctx.session.receiptData;
   } else if (data === 'cancel_receipt') {
+    // Отмена загрузки чека
+    if (fs.existsSync(photoPath)) {
+      try { fs.unlinkSync(photoPath); } catch (e) {}
+    }
+    delete ctx.session.receiptData;
     await ctx.editMessageText('❌ Загрузка чека отменена.', backToMain);
-    if (fs.existsSync(photoPath)) fs.unlinkSync(photoPath);
   }
+}
 
-  delete ctx.session.receiptData;
+async function cancelReceiptHandler(ctx) {
+  // Удаляем данные о чеке из сессии
+  if (ctx.session && ctx.session.receiptData) {
+    // Если был загружен файл — удаляем
+    const { photoPath } = ctx.session.receiptData;
+    if (photoPath && fs.existsSync(photoPath)) {
+      try { fs.unlinkSync(photoPath); } catch (e) {}
+    }
+    delete ctx.session.receiptData;
+  }
+  await ctx.reply('❌ Загрузка чека отменена.', require('../keyboards/keyboards').backToMain);
 }
 
 module.exports = {
@@ -87,4 +135,5 @@ module.exports = {
   offerHandler,
   drawInfoHandler,
   confirmReceiptHandler,
+  cancelReceiptHandler,
 };

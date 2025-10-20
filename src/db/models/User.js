@@ -21,6 +21,11 @@ module.exports = (sequelize) => {
       type: DataTypes.STRING,
       allowNull: true,
     },
+    subscribe: {
+  type: DataTypes.BOOLEAN,
+  allowNull: false,
+  defaultValue: false
+},
   }, {
     timestamps: true,
     tableName: 'Users',
