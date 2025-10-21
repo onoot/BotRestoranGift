@@ -67,7 +67,13 @@ async function offerHandler(ctx) {
 async function drawInfoHandler(ctx) {
   const {drawInfo} = await getMessages();
   const text = drawInfo || 'Розыгрыш временно недоступен.';
-  return ctx.answerCbQuery().then(() => ctx.editMessageText(text, backToMain));
+  await ctx.answerCbQuery();
+try {
+  await ctx.deleteMessage();
+} catch (e) {
+  // игнорируем ошибку удаления
+}
+return ctx.reply(text, backToMain);
 }
 
 async function confirmReceiptHandler(ctx) {
