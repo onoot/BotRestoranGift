@@ -41,28 +41,38 @@ async function infoHandler(ctx) {
   return ctx.answerCbQuery().then(() => 
     ctx.editMessageText(messages.info, backToMain)
   );
-}
-
-async function offerHandler(ctx) {
-  await ctx.answerCbQuery();
+}async function offerHandler(ctx) {
+  try {
+    await ctx.answerCbQuery(); // Отвечаем немедленно
+  } catch (e) {
+    // Игнорируем ошибку "query is too old"
+    if (!e.description?.includes('query is too old')) {
+      console.error('Неожиданная ошибка при ответе на callback:', e);
+    }
+    return; // Не продолжаем обработку устаревшего запроса
+  }
 
   try {
-    await ctx.deleteMessage(); 
+    await ctx.deleteMessage();
   } catch (e) {
+    // Игнорируем
   }
 
   const file = path.join(__dirname, '../../../assets/offer.docx');
 
-  const sent = await ctx.replyWithDocument(
-    { source: file },
-    {
-      caption: 'Вы соглашаетесь с условиями оферты в прикрепленном файле.',
-      ...backToMain,
-    }
-  );
-
-  // Сохраняем ID сообщения с офертой
-  ctx.session.offerMessageId = sent.message_id;
+  try {
+    const sent = await ctx.replyWithDocument(
+      { source: file },
+      {
+        caption: 'Вы соглашаетесь с условиями оферты в прикрепленном файле.',
+        ...backToMain,
+      }
+    );
+    ctx.session.offerMessageId = sent.message_id;
+  } catch (e) {
+    console.error('Ошибка отправки оферты:', e);
+    await ctx.reply('❌ Не удалось отправить оферту. Попробуйте позже.', backToMain);
+  }
 }
 async function drawInfoHandler(ctx) {
   const {drawInfo} = await getMessages();
@@ -79,7 +89,6 @@ return ctx.reply(text, backToMain);
 async function confirmReceiptHandler(ctx) {
   const data = ctx.callbackQuery.data;
 
-  // ⚠️ Сразу отвечаем на callback, чтобы не было ошибки таймаута
   if (data === 'confirm_receipt') {
     await ctx.answerCbQuery('✅ Обработка...');
   } else if (data === 'cancel_receipt') {
