@@ -4,6 +4,8 @@ const { User } = require('../../db/database');
 const { saveReceipt } = require('../../services/receiptService');
 const { getMessages } = require('../../services/messageService');
 const { getDrawSettings } = require('../../services/drawSettingsService'); 
+const path = require('path');
+
 const fs = require('fs');
 const MAX_LENGTH = 4096;
 
@@ -25,9 +27,15 @@ async function startHandler(ctx) {
   });
 
   const messages = await getMessages();
-  return ctx.reply(messages.welcome, mainMenu);
-}
 
+  return ctx.replyWithPhoto(
+    { source: path.join(__dirname, '../../../assets/welcome.jpg') },
+    {
+      caption: messages.welcome,
+      ...mainMenu
+    }
+  );
+}
 async function infoHandler(ctx) {
   const messages = await getMessages();
   return ctx.answerCbQuery().then(() => 
@@ -36,29 +44,26 @@ async function infoHandler(ctx) {
 }
 
 async function offerHandler(ctx) {
-  const messages = await getMessages();
   await ctx.answerCbQuery();
-  try { 
-    await ctx.deleteMessage(); } catch (e) {}
 
-  // Разбиваем текст на части
-  const offerParts = splitText(messages.offer);
-
-  let sentMsgIds = [];
-  for (let i = 0; i < offerParts.length; i++) {
-    if (i === offerParts.length - 1) {
-      // Последняя часть — с кнопкой
-      const msg = await ctx.reply(offerParts[i], cencel);
-      sentMsgIds.push(msg.message_id);
-    } else {
-      // Остальные — без кнопки
-      const msg = await ctx.reply(offerParts[i]);
-      sentMsgIds.push(msg.message_id);
-    }
+  try {
+    await ctx.deleteMessage(); 
+  } catch (e) {
   }
-  ctx.session.offerMsgIds = sentMsgIds;
-}
 
+  const file = path.join(__dirname, '../../../assets/offer.docx');
+
+  const sent = await ctx.replyWithDocument(
+    { source: file },
+    {
+      caption: 'Вы соглашаетесь с условиями оферты в прикрепленном файле.',
+      ...backToMain,
+    }
+  );
+
+  // Сохраняем ID сообщения с офертой
+  ctx.session.offerMessageId = sent.message_id;
+}
 async function drawInfoHandler(ctx) {
   const {drawInfo} = await getMessages();
   const text = drawInfo || 'Розыгрыш временно недоступен.';

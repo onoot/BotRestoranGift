@@ -93,11 +93,33 @@ bot.action('noop', (ctx) => ctx.answerCbQuery());
 bot.action('edit_texts', handleEdit_texts);
 bot.action('admin_export', handleAdminAction('export'));
 bot.action('admin_run_draw', handleAdminAction('draw'));
-bot.action('back_to_main', (ctx) => {
-  ctx.answerCbQuery();
-  ctx.editMessageText('Главное меню:', mainMenu);
-});
 
+bot.action('back_to_main', async (ctx) => {
+  await ctx.answerCbQuery();
+
+  // Получаем ID сообщения, откуда пришёл callback
+  const messageId = ctx.callbackQuery?.message?.message_id;
+  const chatId = ctx.chat.id;
+
+  if (messageId) {
+    try {
+      // Редактируем именно то сообщение, где была кнопка
+      await ctx.telegram.editMessageText(
+        chatId,
+        messageId,
+        null,
+        'Главное меню:',
+        mainMenu
+      );
+      return;
+    } catch (e) {
+      console.warn('Не удалось отредактировать сообщение:', e.message);
+    }
+  }
+
+  // Если редактирование не удалось — отправляем новое
+  await ctx.reply('Главное меню:', mainMenu);
+});
 bot.action('back_cancel_to_main', (ctx) => {
   ctx.answerCbQuery();
   ctx.sendMessage('Главное меню:', mainMenu);

@@ -35,7 +35,7 @@ const confirmReceipt = Markup.inlineKeyboard([
 
 const checkSubcs = Markup.inlineKeyboard([
   Markup.button.callback('✅ Я подписан(а)', 'check_subscription'),
-  Markup.button.url('📣Подписаться', 'https://vk.ru/govno'),
+  Markup.button.url('📣Подписаться', 'https://vk.ru/yalta_izh'),
 ]);
 
 // Упрощённое меню настроек — без "статичных" кнопок
